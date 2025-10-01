@@ -1,47 +1,73 @@
-name: Daily LinkedIn Job Search
+ .github/workflows/linkedin_scraper_weekly.yml
+name: Weekly LinkedIn Job Search
 
 on:
   schedule:
-    # Run daily at 8:00 AM UTC (adjust timezone as needed)
-    - cron: '0 8 * * *'
-  workflow_dispatch: # Allows manual triggering
+    # Runs every Monday at 8:00 AM UTC (9 AM CET / 10 AM Warsaw time in summer)
+    - cron: '0 8 * * 1'
+  
+  # Allow manual trigger for testing
+  workflow_dispatch:
 
 jobs:
-  search-jobs:
+  search_jobs:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
       
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install playwright asyncio
-        playwright install chromium
-        
-    - name: Run LinkedIn job search
-      env:
-        LINKEDIN_EMAIL: ${{ secrets.LINKEDIN_EMAIL }}
-        LINKEDIN_PASSWORD: ${{ secrets.LINKEDIN_PASSWORD }}
-        RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
-        SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
-        SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-      run: |
-        python linkedin_scraper.py
-        
-    - name: Upload logs (if needed)
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: search-logs
-        path: |
-          *.log
-          search-results-*.json
-        retention-days: 7
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install playwright
+          pip install asyncio
+          playwright install chromium
+          playwright install-deps
+      
+      - name: Run LinkedIn scraper
+        env:
+          LINKEDIN_EMAIL: ${{ secrets.LINKEDIN_EMAIL }}
+          LINKEDIN_PASSWORD: ${{ secrets.LINKEDIN_PASSWORD }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+          SMTP_EMAIL: ${{ secrets.SMTP_EMAIL }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+        run: python linkedin_scraper.py
+      
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: debug-screenshots
+          path: |
+            debug_screenshot.png
+            error_screenshot.png
+          retention-days: 7
+
+# Alternative schedules you can use:
+# 
+# Every Sunday at 6 PM:
+# - cron: '0 18 * * 0'
+#
+# Twice a week (Monday and Thursday at 9 AM):
+# - cron: '0 9 * * 1,4'
+#
+# First day of each month at 10 AM:
+# - cron: '0 10 1 * *'
+#
+# Every Monday at 8 AM and Friday at 2 PM:
+# on:
+#   schedule:
+#     - cron: '0 8 * * 1'
+#     - cron: '0 14 * * 5'
